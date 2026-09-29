@@ -1,208 +1,177 @@
-## Finance Manager – Documentação Técnica
+# Personal Finance Manager
 
-### Conteúdo
+[![CI](https://github.com/GabeMed/personal-financial-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/GabeMed/personal-financial-manager/actions/workflows/ci.yml)
 
-1. #### Visão Geral
-2. #### Arquitetura
+A personal finance app: users sign up, record income and expenses in their own
+categories, and get a dashboard with the current balance and a breakdown of
+spending and income per category.
 
-   * Backend (FastAPI + Clean Architecture)
-   * Frontend (React + Lean Architecture)
-3. #### Estrutura de Diretórios
-4. #### Tecnologias e Bibliotecas
-5. #### Configuração & Execução
-6. #### Variáveis de Ambiente
-7. #### API Endpoints Principais
-8. #### Design Patterns & Boas Práticas
-9. #### Requisitos Ausentes
----
+- **Backend:** FastAPI, SQLAlchemy 2, Pydantic v2, JWT (OAuth2 password flow), PostgreSQL or SQLite. Layered as routers → services → CRUD → models.
+- **Frontend:** React 19, TypeScript, Vite, Chakra UI v3, TanStack Query, React Hook Form + Zod, Recharts.
 
-## Visão Geral
+![Dashboard with balance, expense breakdown and transaction list](docs/screenshots/dashboard.png)
 
-Aplicação SPA para gestão financeira pessoal, com autenticação JWT, CRUD de categorias e transações, e dashboard com saldo e gráficos de despesas por categoria.
+<details>
+<summary>Editing a transaction</summary>
 
----
+![Edit transaction dialog](docs/screenshots/edit-dialog.png)
 
-## Arquitetura
+</details>
 
-### Backend
+## Quick start
 
-* **Clean Architecture** dividida em:
-
-  * **Core**: configurações (env/settings), segurança (hash de senha, OAuth2/JWT).
-  * **DB**: SQLAlchemy + SessionLocal/Base; migrações via `Base.metadata.create_all()`.
-  * **Models**: entidades `User`, `Category`, `Transaction` (com enums e relacionamentos).
-  * **Schemas**: Pydantic v2 DTOs separados em Create/Read/Update.
-  * **CRUD**: repositórios em `app/crud/`.
-  * **Services**: lógica de negócio em `app/services/`.
-  * **API**: routers versionados em `app/api/v1/`, protegidos pelo dependency `get_current_user`.
-
-### Frontend
-
-* **Lean Architecture** com pastas claras:
-
-  * **`/context`**: `AuthContext` (login, logout, user).
-  * **`/hooks`**: React Query para dados (`useCategories`, `useTransactions`, `useSummary`, `useCreateCategory`, `useCreateTransaction`, `useUpdateTransaction`, `useDeleteTransaction`).
-  * **`/components`**: UI atômica com Chakra UI v3 (`Dialog`, `Field`, `Button`, etc.), formulários e gráficos (`PieChartCard`).
-  * **`/pages`**: rotas protegidas (`DashboardPage`).
-  * **`/services/apiClient.ts`**: instância Axios com interceptor JWT.
-  * **`/types`**: DTOs TypeScript gerados manualmente.
-  * **`/schemas`**: Zod para validação de payloads de formulário.
-
----
-
-## Estrutura de Diretórios
-
-```text
-backend/                    # FastAPI app
-├─ app/
-│  ├─ core/                 # settings, seguridad
-│  ├─ db/                   # SQLAlchemy Base & Session
-│  ├─ models/               # ORM models
-│  ├─ schemas/              # Pydantic DTOs
-│  ├─ crud/                 # repositórios DB
-│  ├─ services/             # lógica de negócio
-│  └─ api/
-│     └─ v1/                # routers (auth, categories, transactions, summary)
-frontend/                   # React + TS
-├─ src/
-│  ├─ context/              # AuthContext.tsx
-│  ├─ hooks/                # useCategories.ts, useTransactions.ts, useSummary.ts, etc.
-│  ├─ components/           # PieChartCard, TransactionList, TransactionForm ...
-│  ├─ pages/                # DashboardPage.tsx, LoginPage.tsx, RegistrationPage.tsx
-│  ├─ services/             # apiClient.ts, authClient.ts ...
-│  ├─ types/                # CategoryDTO, TransactionDTO, SummaryDTO
-│  └─ schemas/              # NewTransactionSchema, NewCategorySchema
-```
-
----
-
-## Tecnologias e Bibliotecas
-
-* **Backend**: Python 3.10+, FastAPI, Pydantic v2, SQLAlchemy, Uvicorn
-* **Frontend**: React 18, TypeScript, Chakra UI v3, React Query v5, React Router v6, Zod, React Hook Form, Recharts
-* **Autenticação**: OAuth2 Password + JWT Bearer
-
----
-
-## Configuração & Execução
-
-### Clone the repository
-```bash 
-git clone https://github.com/GabeMed/personal-financial-menager.git
-# entre no diretório
-cd personal-financial-menager
-```
-
-### Backend
+Requires Docker.
 
 ```bash
-# criar e ativar venv
-python -m venv .venv && source .venv/bin/activate
-# instalar deps
-cd backend
-pip install -r requirements.txt
-# rodar o backend
-cd ..
+git clone https://github.com/GabeMed/personal-financial-manager.git
+cd personal-financial-manager
+docker compose up --build
+```
+
+| URL | What |
+| --- | --- |
+| http://localhost:5173 | The app. Sign in as **demo / demo1234** (seeded on first start), or create an account. |
+| http://localhost:8000/docs | Interactive API docs (Swagger). Use *Authorize* with the same credentials. |
+
+`docker compose down -v` stops everything and wipes the database.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Browser["Browser<br/>React SPA"]
+
+    subgraph frontend["frontend container"]
+        Nginx["nginx<br/>static build + /api proxy"]
+    end
+
+    subgraph backend["backend container: FastAPI"]
+        direction TB
+        Routers["api/v1 routers<br/>auth · users · categories · transactions"]
+        Auth["core<br/>JWT, bcrypt, settings"]
+        Services["services<br/>business rules"]
+        Crud["crud<br/>SQLAlchemy queries"]
+        Routers --> Auth
+        Routers --> Services --> Crud
+    end
+
+    DB[("PostgreSQL 16<br/>(SQLite for local dev/tests)")]
+
+    Browser -- "HTML/JS" --> Nginx
+    Browser -- "/api/v1/* + Bearer token" --> Nginx
+    Nginx -- "proxy" --> Routers
+    Crud --> DB
+```
+
+**Request flow.** The SPA stores the JWT returned by `POST /api/v1/auth/token`
+and an Axios interceptor attaches it to every request. `get_current_user`
+resolves the token to a user, and every query is scoped by `user_id`, so users
+can only see or modify their own categories and transactions (a request for
+someone else's resource returns 404).
+
+**Layers** (`backend/app/`):
+
+| Layer | Responsibility |
+| --- | --- |
+| `api/v1/` | HTTP only: parse input with Pydantic schemas, call a service, return a response model. |
+| `services/` | Business rules: category names unique per user, a transaction's category must belong to its owner, summary math. Raises `NotFoundError` / `ConflictError`, which `main.py` maps to 404 / 409. |
+| `crud/` | SQLAlchemy queries and writes. |
+| `models/`, `schemas/` | ORM entities (`User`, `Category`, `Transaction`) and request/response DTOs. |
+| `core/` | Settings from environment variables, password hashing, JWT. |
+
+**Balance.** Each user has a stored `balance`. Creating, updating or deleting a
+transaction adjusts it in the same database transaction: the old effect of the
+transaction (+amount for income, −amount for expense) is reverted and the new
+one applied, so changing an amount, a type (income ↔ expense) or both keeps the
+balance correct. The tests check this for every write path.
+
+**Money** is stored as `NUMERIC(10, 2)` and handled as `Decimal` on the server;
+API responses emit JSON numbers for the frontend.
+
+## Running without Docker
+
+Backend (Python 3.12). Run from the repository root, because the code imports
+itself as `backend.app`. With no configuration it uses a local SQLite file
+(`./app.db`).
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r backend/requirements.txt
+python -m backend.app.seed                      # optional: demo / demo1234
 uvicorn backend.app.main:app --reload --port 8000
 ```
 
-### Frontend
+Frontend (Node 22):
 
 ```bash
-cd frontend
-cd finance-app
-# instalar deps
-npm install
-# rodar
-npm run dev
+cd frontend/finance-app
+npm ci
+npm run dev        # http://localhost:5173, talks to http://localhost:8000/api/v1
 ```
 
----
+## Tests
 
-## Variáveis de Ambiente
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest                                   # in-memory SQLite, a fresh DB per test
+TEST_DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/db pytest   # PostgreSQL
+ruff check . && ruff format --check .
+```
 
-| Nome                  | Descrição                     | Exemplo                             |
-| --------------------- | ----------------------------- | ----------------------------------- |
-| `DATABASE_URL`        | URL de conexão com PostgreSQL | `sqlite:///./app.db`                |
-| `SECRET_KEY`          | Chave JWT                     | `yourSecret.`                       |
-| `ACCESS_TOKEN_EXPIRE` | Validade do token (minutos)   | `30`                                |
-| `VITE_API_URL`        | Base URL do backend no front  | `http://localhost:8000/api/v1`      |
+38 API-level tests cover:
 
----
+- **Auth:** registration and validation, duplicate username/e-mail, login, wrong password, missing/invalid/expired tokens.
+- **Categories:** create/list, per-user isolation, case-insensitive duplicates (409), empty or too-long names.
+- **Transactions:** create/list/paginate (newest first), amount and type validation, PATCH of amount / type / category / description with the balance checked after each change, delete, using another user's category or transaction (404).
+- **Summary:** totals, per-category percentages, inclusive date range.
+- **Seed:** idempotent, and the balance matches the seeded transactions.
 
-## API Endpoints Principais
+Frontend checks: `npm run lint` and `npm run build` (which runs `tsc -b`).
 
-| Método | Rota                           | Descrição                                    |
-| ------ | ------------------------------ | -------------------------------------------- |
-| POST   | `/api/v1/auth/token`           | Login, retorna JWT                           |
-| GET    | `/api/v1/users/me`             | Dados do usuário logado                      |
-| GET    | `/api/v1/categories/all`       | Listar categorias do usuário                 |
-| POST   | `/api/v1/categories`           | Criar categoria                              |
-| GET    | `/api/v1/transactions/all`     | Listar transações                            |
-| POST   | `/api/v1/transactions`         | Criar transação                              |
-| PATCH  | `/api/v1/transactions/{id}`    | Editar transação                             |
-| DELETE | `/api/v1/transactions/{id}`    | Excluir transação                            |
-| GET    | `/api/v1/transactions/summary` | Resumo (balance, income/expense totals & %s) |
+[CI](.github/workflows/ci.yml) runs on every push and pull request: ruff and
+pytest on SQLite and PostgreSQL, frontend lint and build, then a smoke test
+that runs `docker compose up --wait` and signs in as the demo user through the
+nginx proxy.
 
----
+## Configuration
 
-## Design Patterns & Boas Práticas
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite:///./app.db` | SQLAlchemy URL; compose uses `postgresql+psycopg://finance:finance@db:5432/finance`. |
+| `SECRET_KEY` | `dev-only-insecure-key` | JWT signing key. **Set this outside local development.** |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Token lifetime. |
+| `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed origins. |
+| `SEED_DEMO_DATA` | `false` (`true` in compose) | Create the demo user on startup. |
+| `VITE_API_URL` | `http://localhost:8000/api/v1` | Frontend build-time API base URL (`/api/v1` in the Docker image). |
 
-* **Clean Architecture** (backend): separação clara entre camadas
-* **React Hooks** para composição de lógica de dados (React Query)
-* **Validação em Runtime** com Zod + `react-hook-form`
-* **JWT + Axios Interceptor** para autenticação automática
+See [.env.example](.env.example).
 
----
+## API
 
-## Requisitos Ausentes
+| Method | Route | Description |
+| --- | --- | --- |
+| POST | `/api/v1/users/register` | Create an account |
+| POST | `/api/v1/auth/token` | Log in (form fields `username`, `password`), returns a JWT |
+| GET | `/api/v1/users/me` | Current user, including balance |
+| GET | `/api/v1/categories/all` | List own categories |
+| POST | `/api/v1/categories` | Create a category |
+| GET | `/api/v1/transactions/all?skip=&limit=` | List own transactions, newest first (limit ≤ 100) |
+| POST | `/api/v1/transactions` | Create a transaction |
+| PATCH | `/api/v1/transactions/{id}` | Partially update a transaction |
+| DELETE | `/api/v1/transactions/{id}` | Delete a transaction |
+| GET | `/api/v1/transactions/summary?start=&end=` | Balance, income/expense totals and % per category |
+| GET | `/health` | Liveness check |
 
-### Testes Unitários
+## Known limitations
 
-#### Backend
+- No migrations: tables are created with `create_all()` on startup. Alembic would be the next step before any schema change.
+- The transaction list has pagination but no filters (date range, category) yet, and the frontend only loads the first page.
+- The JWT lives in `localStorage`; there are no refresh tokens.
+- Timestamps are stored without a time zone (UTC by convention).
+- No frontend unit tests yet; the frontend is checked by lint, type-check and build.
 
-* **Framework**: pytest
- 
-* **Cobertura mínima**:
+## Documentation in Portuguese
 
-  * **Serviços de Categoria** (`app/services/category.py`)
-
-    * criar categoria válida
-    * listar categorias de um usuário
-    * tratar tentativas de duplicação ou nome inválido
-  * **Serviços de Transação** (`app/services/transaction.py`)
-
-    * criar, atualizar e excluir transação
-  * **Resumo (`/transactions/summary`)**
-
-    * agrupar despesas e receitas corretamente
-    * calcular percentuais e balance
-* **Mocks**: fixtures para usuário e sessão de banco de dados in-memory (SQLite)
-
-### Filtragem Básica
-
-#### Backend
-
-* **GET `/transactions`**
-
-  * parâmetros opcionais de query:
-
-    * `start_date` (YYYY-MM-DD)
-    * `end_date` (YYYY-MM-DD)
-    * `category_id` (inteiro)
-  * aplicar filtros no repositório:
-
-    ex:
-    ```python
-    query = db.query(Transaction).filter(Transaction.user_id == user.id)
-    if start_date: query = query.filter(Transaction.date >= start_date)
-    if end_date:   query = query.filter(Transaction.date <= end_date)
-    if category_id: query = query.filter(Transaction.category_id == category_id)
-    ```
-  * retornar lista filtrada
-
-## Motivação das Prioridades
-
-* **Charts em vez de filtros**: um dashboard visual (saldo + gráfico de pizza) dá **insight imediato** sobre os padrões de gastos, acelerando a validação do MVP. Filtros são importantes, mas geram menos “wow” inicial e podem ficar para iteração seguinte.
-* **Teste automatizado deixado para depois**: foquei primeiro na **entrega de valor visível** (autenticação, CRUD, dashboard reativo). Com a base de funcionalidades estável.
-
+The original technical write-up (architecture, directory layout, design
+decisions and priorities) is in [docs/README.pt-BR.md](docs/README.pt-BR.md).

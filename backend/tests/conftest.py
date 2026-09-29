@@ -19,20 +19,28 @@ API = "/api/v1"
 PASSWORD = "secret123"
 
 
+# Tests run on in-memory SQLite by default. CI also runs them on PostgreSQL:
+#   TEST_DATABASE_URL=postgresql+psycopg://user:pass@localhost/db pytest
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
+
+
 @pytest.fixture
 def session_factory():
-    """A fresh in-memory SQLite database per test.
-
-    StaticPool keeps a single connection, so every session sees the same
-    in-memory database.
-    """
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    """A fresh, empty database per test."""
+    if TEST_DATABASE_URL.startswith("sqlite"):
+        # StaticPool keeps a single connection, so every session sees the same
+        # in-memory database.
+        engine = create_engine(
+            TEST_DATABASE_URL,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    else:
+        engine = create_engine(TEST_DATABASE_URL)
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    Base.metadata.drop_all(engine)
     engine.dispose()
 
 

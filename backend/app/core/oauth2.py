@@ -8,7 +8,7 @@ from backend.app.db import session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 
 def authenticate_user(db: Session, username: str, password: str):
@@ -41,7 +41,7 @@ def verify_token(token: str):
         if username is None:
             raise credentials_exception
     except JWTError:
-        raise credentials_exception
+        raise credentials_exception from None
     return username
 
 
@@ -51,5 +51,10 @@ def get_current_user(
     username = verify_token(token)
     user = crud_user.get_user_by_username(db, username)
     if not user:
-        raise HTTPException(status_code=400, detail="User not found")
+        # A valid token for a user that no longer exists is still bad credentials.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user

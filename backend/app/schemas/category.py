@@ -1,8 +1,13 @@
-from pydantic import BaseModel
+from typing import Annotated
+from pydantic import BaseModel, ConfigDict, StringConstraints
+
+CategoryName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
+]
 
 
 class CategoryBase(BaseModel):
-    name: str
+    name: CategoryName
 
 
 class CategoryCreate(CategoryBase):
@@ -12,5 +17,4 @@ class CategoryCreate(CategoryBase):
 class CategoryResponse(CategoryBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,9 +1,10 @@
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
 from backend.app.core.oauth2 import get_current_user
 from backend.app.schemas.transaction import (
+    SummaryResponse,
     TransactionCreate,
     TransactionUpdate,
     TransactionResponse,
@@ -11,11 +12,11 @@ from backend.app.schemas.transaction import (
 from backend.app.services.summary_service import get_summary
 from backend.app.services.transaction_service import (
     list_transactions,
+    get_user_transaction,
     add_transaction,
     modify_transaction,
     remove_transaction,
 )
-from backend.app.models.transaction import Transaction
 from backend.app.models.user import User
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
@@ -23,10 +24,10 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 @router.get("/all", response_model=list[TransactionResponse])
 def read_transactions(
-    skip: int = 0,
-    limit: int = 25,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     return list_transactions(db, current_user.id, skip, limit)
 
@@ -49,16 +50,7 @@ def update_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    transaction: Transaction | None = (
-        db.query(Transaction)
-        .filter(
-            Transaction.id == transaction_id,
-            Transaction.user_id == current_user.id,
-        )
-        .first()
-    )
-    if transaction is None:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+    transaction = get_user_transaction(db, current_user.id, transaction_id)
     return modify_transaction(db, transaction, transaction_in)
 
 
@@ -68,20 +60,11 @@ def delete_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    transaction: Transaction | None = (
-        db.query(Transaction)
-        .filter(
-            Transaction.id == transaction_id,
-            Transaction.user_id == current_user.id,
-        )
-        .first()
-    )
-    if transaction is None:
-        raise HTTPException(status_code=404, detail="Transaction not found")
+    transaction = get_user_transaction(db, current_user.id, transaction_id)
     remove_transaction(db, transaction)
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=SummaryResponse)
 def read_summary(
     start: date | None = Query(None),
     end: date | None = Query(None),

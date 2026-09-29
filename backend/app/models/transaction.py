@@ -1,4 +1,5 @@
-import enum, datetime
+import enum
+from datetime import UTC, datetime
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Numeric, Enum, String
 from sqlalchemy.orm import relationship
 from backend.app.db.base import Base
@@ -18,7 +19,9 @@ class Transaction(Base):
     type = Column(Enum(TransactionType), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     description = Column(String, nullable=True)
-    date = Column(DateTime, default=datetime.datetime.now(datetime.UTC), nullable=False)
+    # The default must be a callable; passing datetime.now(...) directly would
+    # freeze the timestamp at import time.
+    date = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
 
     user = relationship("User", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")

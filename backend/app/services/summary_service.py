@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, timedelta
+from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from backend.app.models.transaction import Transaction, TransactionType
@@ -10,7 +11,9 @@ def get_summary(db: Session, user_id: int, start: date | None, end: date | None)
     if start:
         q = q.filter(Transaction.date >= start)
     if end:
-        q = q.filter(Transaction.date <= end)
+        # `date` is a DATETIME column: compare against the start of the next
+        # day so that transactions made during `end` are included.
+        q = q.filter(Transaction.date < end + timedelta(days=1))
 
     totals = (
         q.with_entities(Transaction.type, func.sum(Transaction.amount).label("total"))
@@ -27,12 +30,18 @@ def get_summary(db: Session, user_id: int, start: date | None, end: date | None)
         .all()
     )
 
-    total_income = sum(t.total for t in totals if t.type == TransactionType.income)
-    total_expense = sum(t.total for t in totals if t.type == TransactionType.expense)
+    total_income = sum(
+        (Decimal(t.total) for t in totals if t.type == TransactionType.income),
+        Decimal(0),
+    )
+    total_expense = sum(
+        (Decimal(t.total) for t in totals if t.type == TransactionType.expense),
+        Decimal(0),
+    )
 
     def porcentage_map(transaction_type, grand_total):
         return {
-            r.category_id: (r.total / grand_total * 100)
+            r.category_id: round(float(Decimal(r.total) / grand_total * 100), 2)
             for r in by_category
             if r.type == transaction_type
         }

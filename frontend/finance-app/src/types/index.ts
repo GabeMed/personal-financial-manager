@@ -11,7 +11,7 @@ export interface TransactionDTO {
   amount: number;
   type: TransactionType;
   category: CategoryDTO;
-  created_at: string;
+  date: string;
 }
 
 export interface SummaryDTO {

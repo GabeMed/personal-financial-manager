@@ -26,7 +26,7 @@ const RegistrationPage = () => {
 
   const onSubmit = (data: RegisterCredentials) =>
     signup(data, {
-      onSuccess: () => navigate("/"),
+      onSuccess: () => navigate("/dashboard"),
     });
 
   return (
@@ -73,7 +73,7 @@ const RegistrationPage = () => {
               Register
             </Button>
             <Box textAlign="center">
-              <Link to="/">Already resgistered ?</Link>
+              <Link to="/">Already registered?</Link>
             </Box>
           </Stack>
         </form>

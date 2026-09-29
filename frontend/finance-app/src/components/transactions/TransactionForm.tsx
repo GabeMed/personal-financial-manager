@@ -13,7 +13,7 @@ import {
   type NewTransactionDTO,
 } from "@/schemas/transaction";
 import { type CategoryDTO, type TransactionDTO } from "@/types/index";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 interface Props {
   categories: CategoryDTO[];
@@ -33,10 +33,10 @@ const TransactionForm = ({
       type: initial?.type ?? "expense",
       category_id: initial?.category.id ?? categories[0]?.id ?? null,
       description: initial?.description ?? "",
-      amount: initial?.amount ?? 0,
+      amount: initial ? Number(initial.amount) : 0,
       newCategoryName: "",
     }),
-    [categories]
+    [categories, initial]
   );
 
   const {
@@ -50,11 +50,21 @@ const TransactionForm = ({
     defaultValues,
   });
 
+  // The dialogs stay mounted and useForm only reads defaultValues on the first
+  // render, so load the selected transaction whenever it changes.
+  useEffect(() => {
+    reset(defaultValues);
+  }, [defaultValues, reset]);
+
   const wantsNew = watch("category_id") === null;
 
   async function internalSubmit(values: NewTransactionDTO) {
-    await onSubmit(values);
-    reset();
+    try {
+      await onSubmit(values);
+      reset();
+    } catch {
+      // The dialog shows the error; keep what the user typed.
+    }
   }
 
   return (

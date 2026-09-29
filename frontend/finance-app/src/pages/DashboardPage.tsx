@@ -4,14 +4,11 @@ import useCategories from "@/hooks/useCategories";
 import TransactionList from "@/components/transactions/TransactionList";
 import { BalanceCard } from "@/components/layout/BalanceCard";
 import { SummaryCharts } from "@/components/charts/SummaryCharts";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { authService } from "@/services/authClient";
 
+// Access control lives in <ProtectedRoute />.
 const DashboardPage = () => {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-  if (!isAuthenticated) navigate("/");
+  const { logout } = useAuth();
 
   const { data: summary, isLoading: summaryLoading } = useSummary();
   const { data: categories = [] } = useCategories();
@@ -49,7 +46,7 @@ const DashboardPage = () => {
           fontWeight="bold"
           size="lg"
           variant="ghost"
-          onClick={authService.logout}
+          onClick={logout}
         >
           Logout
         </Button>

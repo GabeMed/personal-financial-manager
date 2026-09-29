@@ -1,4 +1,4 @@
-import { Dialog, Portal, Spinner, Box, Text } from "@chakra-ui/react";
+import { Alert, Dialog, Portal, Spinner, Box, Text } from "@chakra-ui/react";
 import { type TransactionDTO } from "@/types";
 import useAddFormTransaction from "@/hooks/useAddFormTransaction";
 import useUpdateTransaction from "@/hooks/useUpdateTransaction";
@@ -6,6 +6,7 @@ import TransactionForm from "./TransactionForm";
 import { type NewTransactionDTO } from "@/schemas/transaction";
 import useCategories from "@/hooks/useCategories";
 import { useCallback } from "react";
+import { getErrorMessage } from "@/services/errors";
 
 interface AddEditTransactionDialogProps {
   mode: "create" | "edit";
@@ -24,6 +25,14 @@ const AddEditTransactionDialog = ({
   const saveMutation = useAddFormTransaction();
   const updateMutation = useUpdateTransaction();
 
+  const mutation = mode === "create" ? saveMutation : updateMutation;
+
+  const close = useCallback(() => {
+    saveMutation.reset();
+    updateMutation.reset();
+    onClose();
+  }, [saveMutation, updateMutation, onClose]);
+
   const handleSubmit = useCallback(
     async (values: NewTransactionDTO) => {
       if (mode === "create") {
@@ -31,9 +40,9 @@ const AddEditTransactionDialog = ({
       } else if (initial) {
         await updateMutation.mutateAsync({ id: initial.id, body: values });
       }
-      onClose();
+      close();
     },
-    [mode, saveMutation, updateMutation, initial, onClose]
+    [mode, saveMutation, updateMutation, initial, close]
   );
 
   const loading = catsLoading;
@@ -41,7 +50,7 @@ const AddEditTransactionDialog = ({
   return (
     <Dialog.Root
       open={isOpen}
-      onOpenChange={(open) => !open && onClose()}
+      onOpenChange={(open) => !open && close()}
       placement="center"
       size="lg"
     >
@@ -56,6 +65,12 @@ const AddEditTransactionDialog = ({
             </Dialog.Header>
 
             <Dialog.Body>
+              {mutation.error && (
+                <Alert.Root status="error" mb="4">
+                  <Alert.Indicator />
+                  <Alert.Title>{getErrorMessage(mutation.error)}</Alert.Title>
+                </Alert.Root>
+              )}
               {loading ? (
                 <Box py={6} textAlign="center">
                   <Spinner />
@@ -68,7 +83,7 @@ const AddEditTransactionDialog = ({
                   categories={categories}
                   initial={initial}
                   onSubmit={handleSubmit}
-                  onCancel={onClose}
+                  onCancel={close}
                 />
               )}
             </Dialog.Body>

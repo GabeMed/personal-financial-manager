@@ -62,7 +62,7 @@ export default function LoginPage() {
             </Field.Root>
 
             <Button w="full" type="submit" loading={isPending}>
-              Entrar
+              Sign in
             </Button>
             <Box textAlign="center">
               <Link to="/register" color="teal.500">

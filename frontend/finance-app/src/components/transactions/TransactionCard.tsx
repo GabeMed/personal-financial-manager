@@ -24,7 +24,7 @@ const TransactionCard = ({ transaction, onEdit, onDelete }: Props) => {
             })}
           </Text>
           <Text fontSize="xs" color="gray.500">
-            {new Date(transaction.created_at).toLocaleDateString("pt-BR")} •{" "}
+            {new Date(transaction.date).toLocaleDateString("pt-BR")} •{" "}
             {transaction.category.name}
           </Text>
         </Box>

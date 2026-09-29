@@ -1,4 +1,5 @@
 import { jwtDecode } from "jwt-decode";
+import { getErrorMessage } from "@/services/errors";
 import { loginGateway, meGateway, registerGateway } from "@/services/gateway";
 import {
   loginSchema,
@@ -49,27 +50,24 @@ export const authService = {
       const user = await meGateway();
       saveUser(user);
       return { token: access_token, user };
-    } catch (err: any) {
-      const msg = err.response?.data?.detail ?? err.message ?? "Login failed";
-      throw new Error(msg);
+    } catch (err) {
+      throw new Error(getErrorMessage(err, "Login failed"));
     }
   },
 
-  async register(credentials: RegisterCredentials): Promise<User> {
+  async register(credentials: RegisterCredentials): Promise<LoginResult> {
     registerSchema.parse(credentials);
 
     try {
-      const user = await registerGateway(credentials);
-      await authService.login({
-        username: credentials.username,
-        password: credentials.password,
-      });
-      return user;
-    } catch (err: any) {
-      const msg =
-        err.response?.data?.detail ?? err.message ?? "Register failed";
-      throw new Error(msg);
+      await registerGateway(credentials);
+    } catch (err) {
+      throw new Error(getErrorMessage(err, "Register failed"));
     }
+    // Sign the new user in right away.
+    return authService.login({
+      username: credentials.username,
+      password: credentials.password,
+    });
   },
 
   isAuthenticated(): boolean {

@@ -6,7 +6,7 @@ from backend.app.db.session import get_db
 from backend.app.schemas.token import Token
 from fastapi.security import OAuth2PasswordRequestForm
 
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/token", response_model=Token)

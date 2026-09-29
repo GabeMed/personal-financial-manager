@@ -25,7 +25,7 @@ const PieChartCard = ({ title, data }: PieChartCardProps) => {
     return (
       <Box bg="gray.700" p={6} rounded="2xl" shadow="lg" textAlign="center">
         <Text fontSize="sm" color="gray.400">
-          No expenses registered
+          No {title.toLowerCase()} registered
         </Text>
       </Box>
     );
